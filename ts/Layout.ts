@@ -61,7 +61,7 @@ export class Layout {
     const angle = 2 * Math.PI * (o.startAngle + corner) / 6;
     return new Point(size.width * Math.cos(angle), size.height * Math.sin(angle));
   }
-  
+
   public hexSideOffset(side: number, size: Size = this.hexSize): Point {
     const o = this.orientation;
     const angle = 2 * Math.PI * (o.startAngle + 0.5 + side) / 6;

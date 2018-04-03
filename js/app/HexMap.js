@@ -27,6 +27,13 @@ define(["require", "exports", "./Hex", "./Point", "lib/easeljs"], function (requ
         HexMap.prototype.get = function (q, r) {
             return this.hexes[Hex_1.Hex.fromQR(q, r).hash()];
         };
+        HexMap.prototype.redraw = function () {
+            for (var key in this.hexes) {
+                if (this.hexes.hasOwnProperty(key)) {
+                    this.hexes[key].draw();
+                }
+            }
+        };
         HexMap.prototype.draw = function (stage, layout) {
             var canvas = stage.canvas;
             var width = canvas.clientWidth;

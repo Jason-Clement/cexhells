@@ -1,4 +1,5 @@
-define(["require", "exports", "lib/easeljs"], function (require, exports) {
+/* tslint:disable:no-bitwise */
+define(["require", "exports", "./App", "./Point", "lib/easeljs"], function (require, exports, App_1, Point_1) {
     "use strict";
     exports.__esModule = true;
     var HexType;
@@ -20,6 +21,12 @@ define(["require", "exports", "lib/easeljs"], function (require, exports) {
             this.q = q;
             this.r = r;
             this.s = s;
+            this.sideCountImportStrings = ["\\", "[", "-", "]", "/", "|"];
+            this.type = HexType.Invisible;
+            this.surroundCount = 0;
+            this.extendCount = 0;
+            this.countType = HexCountType.Invisible;
+            this.sideCountDirection = -1;
             this.shape = new createjs.Shape();
             this.text = new createjs.Text();
             this.stage = null;
@@ -31,12 +38,6 @@ define(["require", "exports", "lib/easeljs"], function (require, exports) {
                 invisible: { border: "transparent", fill: "transparent" },
                 normal: { border: "#2c2f31", fill: "#3e3e3e" }
             };
-            this.type = HexType.Invisible;
-            this.surroundCount = 0;
-            this.extendCount = 0;
-            this.sideCountDirection = -1;
-            this.countType = HexCountType.Invisible;
-            this.displayOnStart = false;
             this.neighbors = [];
             this.sideCount = [];
             for (var i = 0; i < 6; i++) {
@@ -44,15 +45,10 @@ define(["require", "exports", "lib/easeljs"], function (require, exports) {
             }
             this.shape.addEventListener("mousedown", function (event) {
                 if (event.nativeEvent.which === 1) {
-                    _this.cycleType();
+                    _this.handleLeftClick(event);
                 }
                 else if (event.nativeEvent.which === 3) {
-                    if (_this.type === HexType.Invisible && event.nativeEvent.shiftKey) {
-                        _this.cycleSideCountSide();
-                    }
-                    else {
-                        _this.cycleCountType();
-                    }
+                    _this.handleRightClick(event);
                 }
             });
         }
@@ -73,6 +69,111 @@ define(["require", "exports", "lib/easeljs"], function (require, exports) {
         };
         Hex.fromSR = function (s, r) {
             return new Hex(-r - s, r, s);
+        };
+        Hex.fromAxial = function (x, y) {
+            var q = x;
+            var s = y - (x - (x & 1)) / 2;
+            return Hex.fromQS(q, s);
+        };
+        Hex.fromImportString = function (x, y, s) {
+            var typeS = s.substr(0, 1);
+            var countS = s.substr(1, 1);
+            var h = Hex.fromAxial(x, y);
+            h.covered = false;
+            switch (typeS) {
+                case ".":
+                    h.type = HexType.Invisible;
+                    break;
+                case "o":
+                    h.type = HexType.Normal;
+                    h.covered = true;
+                    break;
+                case "O":
+                    h.type = HexType.Normal;
+                    break;
+                case "x":
+                    h.type = HexType.Blue;
+                    h.covered = true;
+                    break;
+                case "X":
+                    h.type = HexType.Blue;
+                    break;
+                case "\\":
+                    h.type = HexType.Invisible;
+                    h.sideCountDirection = 0;
+                    break;
+                case "[":
+                    h.type = HexType.Invisible;
+                    h.sideCountDirection = 1;
+                    break;
+                case "-":
+                    h.type = HexType.Invisible;
+                    h.sideCountDirection = 2;
+                    break;
+                case "]":
+                    h.type = HexType.Invisible;
+                    h.sideCountDirection = 3;
+                    break;
+                case "/":
+                    h.type = HexType.Invisible;
+                    h.sideCountDirection = 4;
+                    break;
+                case "|":
+                    h.type = HexType.Invisible;
+                    h.sideCountDirection = 5;
+                    break;
+            }
+            switch (countS) {
+                case ".":
+                    h.countType = h.type === HexType.Normal ? HexCountType.QuestionMark : HexCountType.Invisible;
+                    break;
+                case "+":
+                    h.countType = HexCountType.Plain;
+                    break;
+                case "c":
+                    h.countType = HexCountType.Extended;
+                    break;
+                case "n":
+                    h.countType = HexCountType.Extended;
+                    break;
+            }
+            return h;
+        };
+        Hex.prototype.toAxial = function () {
+            var col = this.q;
+            var row = this.s + (this.q - (this.q & 1)) / 2;
+            return new Point_1.Point(col, row);
+        };
+        Hex.prototype.toImportString = function () {
+            var t = ".";
+            if (this.countType !== HexCountType.Invisible && this.countType !== HexCountType.Plain) {
+                t = "+";
+                if (this.countType === HexCountType.Extended) {
+                    var u = this.text.text.substr(0, 1);
+                    if (u === "{")
+                        t = "c";
+                    else if (u === "-")
+                        t = "n";
+                }
+            }
+            if (this.type === HexType.Invisible) {
+                if (this.sideCountDirection > -1) {
+                    return this.sideCountImportStrings[this.sideCountDirection] + t;
+                }
+                return "." + t;
+            }
+            else if (this.type === HexType.Normal) {
+                if (this.covered) {
+                    return "O" + t;
+                }
+                return "o" + t;
+            }
+            else {
+                if (this.covered) {
+                    return "X" + t;
+                }
+                return "x" + t;
+            }
         };
         Hex.prototype.hash = function () {
             return this.q + "," + this.r;
@@ -126,7 +227,7 @@ define(["require", "exports", "lib/easeljs"], function (require, exports) {
                     break;
                 }
             }
-            if (this.covered) {
+            if (this.covered && App_1.App.mode !== App_1.AppMode.Edit) {
                 color = this.colors.covered;
             }
             var g = this.shape.graphics;
@@ -142,6 +243,8 @@ define(["require", "exports", "lib/easeljs"], function (require, exports) {
             this.text.textBaseline = "middle";
             this.text.textAlign = "center";
             this.text.rotation = 0;
+            if (this.covered && App_1.App.mode !== App_1.AppMode.Edit)
+                return;
             if (this.type === HexType.Normal) {
                 this.text.font = (size.width * 0.75).toString() + "px Harabara";
                 this.text.color = "white";
@@ -165,12 +268,10 @@ define(["require", "exports", "lib/easeljs"], function (require, exports) {
                             }
                             consecutive = j === this.surroundCount;
                         }
-                        if (consecutive) {
+                        if (consecutive)
                             this.text.text = "{" + this.text.text + "}";
-                        }
-                        else {
+                        else
                             this.text.text = "-" + this.text.text + "-";
-                        }
                     }
                 }
             }
@@ -184,9 +285,9 @@ define(["require", "exports", "lib/easeljs"], function (require, exports) {
             else if (this.type === HexType.Invisible) {
                 if (this.sideCountDirection > -1) {
                     var d = (6 - this.sideCountDirection) % 6;
-                    var p_1 = this.layout.hexSideOffset(d, size.scale(0.5));
-                    this.text.x += p_1.x;
-                    this.text.y += p_1.y;
+                    var pOffset = this.layout.hexSideOffset(d, size.scale(0.5));
+                    this.text.x += pOffset.x;
+                    this.text.y += pOffset.y;
                     this.text.font = (size.width * 0.55).toString() + "px Harabara";
                     this.text.rotation = this.layout.hexSideAngle(d) * 180 / Math.PI - 90;
                     this.text.color = "#464646";
@@ -195,21 +296,17 @@ define(["require", "exports", "lib/easeljs"], function (require, exports) {
                         var i = this.sideCountDirection;
                         var c = 0;
                         var n = this.neighbors[i];
-                        while (n !== undefined && n.type !== HexType.Blue) {
+                        while (n !== undefined && n.type !== HexType.Blue)
                             n = n.neighbors[i];
-                        }
                         while (n !== undefined && n.type !== HexType.Normal && c < this.sideCount[i]) {
-                            if (n.type === HexType.Blue) {
+                            if (n.type === HexType.Blue)
                                 c++;
-                            }
                             n = n.neighbors[i];
                         }
-                        if (c === this.sideCount[i]) {
+                        if (c === this.sideCount[i])
                             this.text.text = "{" + this.text.text + "}";
-                        }
-                        else {
+                        else
                             this.text.text = "-" + this.text.text + "-";
-                        }
                     }
                 }
             }
@@ -333,6 +430,26 @@ define(["require", "exports", "lib/easeljs"], function (require, exports) {
         Hex.prototype.randomize = function () {
             var types = [HexType.Invisible, HexType.Normal, HexType.Blue];
             this.type = types[Math.floor(Math.random() * 4)];
+        };
+        Hex.prototype.handleLeftClick = function (event) {
+            if (App_1.App.mode === App_1.AppMode.Edit) {
+                this.cycleType();
+            }
+            else if (App_1.App.mode === App_1.AppMode.EditInit) {
+                this.covered = !this.covered;
+                this.draw();
+                App_1.App.stage.update();
+            }
+        };
+        Hex.prototype.handleRightClick = function (event) {
+            if (App_1.App.mode === App_1.AppMode.Edit) {
+                if (this.type === HexType.Invisible && event.nativeEvent.shiftKey) {
+                    this.cycleSideCountSide();
+                }
+                else {
+                    this.cycleCountType();
+                }
+            }
         };
         Hex.directions = [
             new Hex(1, 0, -1),

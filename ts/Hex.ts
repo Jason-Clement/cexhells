@@ -1,5 +1,9 @@
+/* tslint:disable:no-bitwise */
+
 import "lib/easeljs";
+import { App, AppMode } from "./App";
 import { Layout } from "./Layout";
+import { Point } from "./Point";
 
 export enum HexType {
   Invisible,
@@ -49,14 +53,48 @@ export class Hex {
     return new Hex(-r - s, r, s);
   }
 
-  public type: HexType;
+  public static fromAxial(x: number, y: number): Hex {
+    const q = x;
+    const s = y - (x - (x & 1)) / 2;
+    return Hex.fromQS(q, s);
+  }
+
+  public static fromImportString(x: number, y: number, s: string): Hex {
+    const typeS = s.substr(0, 1);
+    const countS = s.substr(1, 1);
+    const h = Hex.fromAxial(x, y);
+    h.covered = false;
+    switch (typeS) {
+      case ".": h.type = HexType.Invisible; break;
+      case "o": h.type = HexType.Normal; h.covered = true; break;
+      case "O": h.type = HexType.Normal; break;
+      case "x": h.type = HexType.Blue; h.covered = true; break;
+      case "X": h.type = HexType.Blue; break;
+      case "\\": h.type = HexType.Invisible; h.sideCountDirection = 0; break;
+      case "[": h.type = HexType.Invisible; h.sideCountDirection = 1; break;
+      case "-": h.type = HexType.Invisible; h.sideCountDirection = 2; break;
+      case "]": h.type = HexType.Invisible; h.sideCountDirection = 3; break;
+      case "/": h.type = HexType.Invisible; h.sideCountDirection = 4; break;
+      case "|": h.type = HexType.Invisible; h.sideCountDirection = 5; break;
+    }
+    switch (countS) {
+      case ".": h.countType = h.type === HexType.Normal ? HexCountType.QuestionMark : HexCountType.Invisible; break;
+      case "+": h.countType = HexCountType.Plain; break;
+      case "c": h.countType = HexCountType.Extended; break;
+      case "n": h.countType = HexCountType.Extended; break;
+    }
+    return h;
+  }
+
+  public sideCountImportStrings = ["\\", "[", "-", "]", "/", "|"];
+
+  public type: HexType = HexType.Invisible;
   public neighbors: Hex[];
   public sideCount: number[];
-  public surroundCount: number;
-  public extendCount: number;
-  public countType: HexCountType;
-  public sideCountDirection: number;
-  public displayOnStart: boolean;
+  public surroundCount: number = 0;
+  public extendCount: number = 0;
+  public countType: HexCountType = HexCountType.Invisible;
+  public sideCountDirection: number = -1;
   public shape: createjs.Shape = new createjs.Shape();
   public text: createjs.Text = new createjs.Text();
   public stage: createjs.Stage = null;
@@ -75,12 +113,6 @@ export class Hex {
     public r: number,
     public s: number,
   ) {
-    this.type = HexType.Invisible;
-    this.surroundCount = 0;
-    this.extendCount = 0;
-    this.sideCountDirection = -1;
-    this.countType = HexCountType.Invisible;
-    this.displayOnStart = false;
     this.neighbors = [];
     this.sideCount = [];
     for (let i = 0; i < 6; i++) {
@@ -88,15 +120,41 @@ export class Hex {
     }
     this.shape.addEventListener("mousedown", (event: createjs.MouseEvent) => {
       if (event.nativeEvent.which === 1) {
-        this.cycleType();
+        this.handleLeftClick(event);
       } else if (event.nativeEvent.which === 3) {
-        if (this.type === HexType.Invisible && event.nativeEvent.shiftKey) {
-          this.cycleSideCountSide();
-        } else {
-          this.cycleCountType();
-        }
+        this.handleRightClick(event);
       }
     });
+  }
+
+  public toAxial(): Point {
+    const col = this.q;
+    const row = this.s + (this.q - (this.q & 1)) / 2;
+    return new Point(col, row);
+  }
+
+  public toImportString() {
+    let t = ".";
+    if (this.countType !== HexCountType.Invisible && this.countType !== HexCountType.Plain) {
+      t = "+";
+      if (this.countType === HexCountType.Extended) {
+        const u = this.text.text.substr(0, 1);
+        if (u === "{")
+          t = "c";
+        else if (u === "-")
+          t = "n";
+      }
+    }
+    if (this.type === HexType.Invisible) {
+      if (this.sideCountDirection > -1) { return this.sideCountImportStrings[this.sideCountDirection] + t; }
+      return "." + t;
+    } else if (this.type === HexType.Normal) {
+      if (this.covered) { return "O" + t; }
+      return "o" + t;
+    } else {
+      if (this.covered) { return "X" + t; }
+      return "x" + t;
+    }
   }
 
   public hash(): string {
@@ -139,7 +197,7 @@ export class Hex {
       case HexType.Invisible: { color = this.colors.invisible; break; }
       case HexType.Blue: { color = this.colors.blue; break; }
     }
-    if (this.covered) {
+    if (this.covered && App.mode !== AppMode.Edit) {
       color = this.colors.covered;
     }
     const g = this.shape.graphics;
@@ -155,6 +213,8 @@ export class Hex {
     this.text.textBaseline = "middle";
     this.text.textAlign = "center";
     this.text.rotation = 0;
+    if (this.covered && App.mode !== AppMode.Edit)
+      return;
     if (this.type === HexType.Normal) {
       this.text.font = (size.width * 0.75).toString() + "px Harabara";
       this.text.color = "white";
@@ -175,11 +235,10 @@ export class Hex {
             }
             consecutive = j === this.surroundCount;
           }
-          if (consecutive) {
+          if (consecutive)
             this.text.text  = "{" + this.text.text + "}";
-          } else {
+          else
             this.text.text = "-" + this.text.text + "-";
-          }
         }
       }
     } else if (this.type === HexType.Blue) {
@@ -190,32 +249,29 @@ export class Hex {
       }
     } else if (this.type === HexType.Invisible) {
       if (this.sideCountDirection > -1) {
-        let d = (6 - this.sideCountDirection) % 6;
-        let p = this.layout.hexSideOffset(d, size.scale(0.5));
-        this.text.x += p.x;
-        this.text.y += p.y;
+        const d = (6 - this.sideCountDirection) % 6;
+        const pOffset = this.layout.hexSideOffset(d, size.scale(0.5));
+        this.text.x += pOffset.x;
+        this.text.y += pOffset.y;
         this.text.font = (size.width * 0.55).toString() + "px Harabara";
         this.text.rotation = this.layout.hexSideAngle(d) * 180 / Math.PI - 90;
         this.text.color = "#464646";
         this.text.text = this.sideCount[this.sideCountDirection].toString();
         if (this.countType === HexCountType.Extended && this.sideCount[this.sideCountDirection] > 1) {
-          let i = this.sideCountDirection;
+          const i = this.sideCountDirection;
           let c = 0;
           let n = this.neighbors[i];
-          while (n !== undefined && n.type !== HexType.Blue) {
+          while (n !== undefined && n.type !== HexType.Blue)
             n = n.neighbors[i];
-          }
           while (n !== undefined && n.type !== HexType.Normal && c < this.sideCount[i]) {
-            if (n.type === HexType.Blue) {
+            if (n.type === HexType.Blue)
               c++;
-            }
             n = n.neighbors[i];
           }
-          if (c === this.sideCount[i]) {
+          if (c === this.sideCount[i])
             this.text.text = "{" + this.text.text + "}";
-          } else {
+          else
             this.text.text = "-" + this.text.text + "-";
-          }
         }
       }
     }
@@ -266,7 +322,7 @@ export class Hex {
         this.countType = HexCountType.Plain;
       }
     } else if (this.type === HexType.Invisible) {
-      let i = this.sideCountDirection;
+      const i = this.sideCountDirection;
       if (i > -1) {
         if (this.sideCount[i] <= 1 || this.countType === HexCountType.Extended) {
           this.countType = HexCountType.Plain;
@@ -308,7 +364,7 @@ export class Hex {
         if (n.neighbors[i] !== undefined) {
           n.neighbors[i].draw();
         }
-        let j = i === 5 ? 0 : i + 1;
+        const j = i === 5 ? 0 : i + 1;
         if (n.neighbors[j] !== undefined) {
           n.neighbors[j].draw();
         }
@@ -321,7 +377,7 @@ export class Hex {
   }
 
   public changeType(type: HexType) {
-    let prevType = this.type;
+    const prevType = this.type;
     this.type = type;
     if (prevType === HexType.Blue && type !== HexType.Blue) {
       this.updateCounts(-1);
@@ -334,6 +390,26 @@ export class Hex {
   public randomize() {
     const types = [ HexType.Invisible, HexType.Normal, HexType.Blue ];
     this.type = types[Math.floor(Math.random() * 4)];
+  }
+
+  private handleLeftClick(event: createjs.MouseEvent) {
+    if (App.mode === AppMode.Edit) {
+      this.cycleType();
+    } else if (App.mode === AppMode.EditInit) {
+      this.covered = !this.covered;
+      this.draw();
+      App.stage.update();
+    }
+  }
+
+  private handleRightClick(event: createjs.MouseEvent) {
+    if (App.mode === AppMode.Edit) {
+      if (this.type === HexType.Invisible && event.nativeEvent.shiftKey) {
+        this.cycleSideCountSide();
+      } else {
+        this.cycleCountType();
+      }
+    }
   }
 
 }

@@ -33,6 +33,14 @@ export class HexMap {
     return this.hexes[Hex.fromQR(q, r).hash()];
   }
 
+  public redraw() {
+    for (const key in this.hexes) {
+      if (this.hexes.hasOwnProperty(key)) {
+        this.hexes[key].draw();
+      }
+    }
+  }
+
   public draw(stage: createjs.Stage, layout: Layout) {
     const canvas = stage.canvas as HTMLCanvasElement;
     const width = canvas.clientWidth;
