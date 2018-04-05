@@ -4,10 +4,22 @@ There is a hexcells editor already in existence by [oprypin](https://github.com/
 
 I wanted to make my own for funzies. I'm not sure I'll actually finish it.
 
-## Current Controls
+## Hotkeys
+
+| Key | Description |
+| --- | --- |
+| <kbd>e</kbd> | switch between edit and init modes |
+
+## Edit Mode Controls
 
 | Action | Description |
 | --- | --- |
 | left click | cycle cell type |
 | right click | cycle number type |
 | shift+right click empty cell | cycle side number |
+
+## Init Mode Controls
+
+| Action | Description |
+| --- | --- |
+| left click | change whether cell is initially hidden |
