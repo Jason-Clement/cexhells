@@ -1,30 +1,12 @@
-define(["require", "exports", "./Hex", "./Orientation", "./Point", "./Size"], function (require, exports, Hex_1, Orientation_1, Point_1, Size_1) {
+define(["require", "exports", "./HexBase", "./Orientation", "./Point"], function (require, exports, HexBase_1, Orientation_1, Point_1) {
     "use strict";
     exports.__esModule = true;
     var Layout = /** @class */ (function () {
-        function Layout(orientationType, size, hexSize, origin) {
-            this.orientationType = orientationType;
-            this.size = size;
-            this.hexSize = hexSize;
-            this.origin = origin;
-            this.orientation = orientationType === Orientation_1.OrientationType.Flat ? Orientation_1.Orientation.flat : Orientation_1.Orientation.pointy;
+        function Layout(hexCount) {
+            this.hexCount = hexCount;
+            this.origin = new Point_1.Point(0, 0);
+            this.orientation = Orientation_1.Orientation.flat;
         }
-        Layout.fillBySize = function (orientationType, hexSize, fillSize) {
-            var layout = new Layout(orientationType, new Size_1.Size(0, 0), hexSize, new Point_1.Point(0, 0));
-            layout.size.width = layout.fillToWidth(fillSize.width);
-            layout.size.height = layout.fillToHeight(fillSize.height);
-            return layout;
-        };
-        Layout.fillByCount = function (orientationType, hexCount, fillSize) {
-            var layout = new Layout(orientationType, hexCount, new Size_1.Size(0, 0), new Point_1.Point(0, 0));
-            if (orientationType === Orientation_1.OrientationType.Pointy) {
-                layout.hexSize = Size_1.Size.square(Math.min(Math.floor(fillSize.width / (Math.sqrt(3) * hexCount.width)), Math.floor(fillSize.height / hexCount.height / 1.5)));
-            }
-            else {
-                layout.hexSize = Size_1.Size.square(Math.min(Math.floor(fillSize.width / hexCount.width / 1.5), Math.floor(fillSize.height / (Math.sqrt(3) * hexCount.height))));
-            }
-            return layout;
-        };
         Layout.prototype.hexToPixel = function (hex) {
             var o = this.orientation;
             var x = (o.f0 * hex.q + o.f1 * hex.r) * this.hexSize.width;
@@ -36,7 +18,7 @@ define(["require", "exports", "./Hex", "./Orientation", "./Point", "./Size"], fu
             var p = new Point_1.Point((point.x - this.origin.x) / this.hexSize.width, (point.y - this.origin.y) / this.hexSize.height);
             var q = o.b0 * p.x + o.b1 * p.y;
             var r = o.b2 * p.x + o.b3 * p.y;
-            return new Hex_1.Hex(q, r, -q - r);
+            return new HexBase_1.HexBase(q, r, -q - r);
         };
         Layout.prototype.hexCornerOffset = function (corner, size) {
             if (size === void 0) { size = this.hexSize; }
@@ -64,22 +46,6 @@ define(["require", "exports", "./Hex", "./Orientation", "./Point", "./Size"], fu
                 corners.push(new Point_1.Point(center.x + offset.x, center.y + offset.y));
             }
             return corners;
-        };
-        Layout.prototype.fillToWidth = function (width) {
-            if (this.orientationType === Orientation_1.OrientationType.Pointy) {
-                return Math.floor(width / (Math.sqrt(3) * this.hexSize.width));
-            }
-            else {
-                return Math.floor(width / (2 * this.hexSize.width * 0.75));
-            }
-        };
-        Layout.prototype.fillToHeight = function (height) {
-            if (this.orientationType === Orientation_1.OrientationType.Pointy) {
-                return Math.floor(height / (2 * this.hexSize.height * 0.75));
-            }
-            else {
-                return Math.floor(height / (Math.sqrt(3) * this.hexSize.height));
-            }
         };
         return Layout;
     }());

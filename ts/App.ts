@@ -1,29 +1,23 @@
 /* tslint:disable:no-console */
 
 import "lib/easeljs";
-import { Hex, HexType } from "./Hex";
-import { HexMap } from "./HexMap";
+import { AppMode } from "./AppMode";
+import { Board } from "./Board";
+import { HexBase } from "./HexBase";
 import { Layout } from "./Layout";
 import { OrientationType } from "./Orientation";
 import { Point } from "./Point";
 import { Size } from "./Size";
 
-export enum AppMode {
-  Edit,
-  EditInit,
-  Play,
-}
-
 export class App {
 
   public static canvas: HTMLCanvasElement;
   public static stage: createjs.Stage;
-  public static layout: Layout;
-  public static map: HexMap;
+  public static board: Board;
   public static mode: AppMode = AppMode.Edit;
 
-  public static importString =
-      "............|n..|+..|+......|+......|+............................\n"
+  public static importString = "\n\n\n\n\n"
+    + "............|n..|+..|+......|+......|+............................\n"
     + "..............\\+..\\+..|+................../+..\\c..................\n"
     + "............x+..x...o...x...o...x...x...o...o...o...x.............\n"
     + "......\\+..x...x...o+..x...x+..x...o...o+..x...x...o...x...........\n"
@@ -57,28 +51,31 @@ export class App {
     + "......o...oc..x...o+..o+..o...oc..x...o+..on..o+..o...o...o.......\n"
     + "....x...x...o+..o+..x...x...o+..x...x...o+..x...x...x...x...x.....";
 
+  public static width(): number {
+    return this.canvas.clientWidth * 0.9;
+  }
+
+  public static height(): number {
+    return this.canvas.clientHeight * 0.9;
+  }
+
   public static start(canvas: HTMLCanvasElement) {
 
     App.canvas = canvas;
     App.stage = new createjs.Stage(canvas);
+    App.board = new Board(new Size(10, 10));
+    for (const key in App.board.hexes) {
+      if (App.board.hexes.hasOwnProperty(key)) {
+        App.board.hexes[key].randomize();
+      }
+    }
+    // App.board.import(App.importString);
 
-    App.import(App.importString);
+    canvas.oncontextmenu = () => false;
 
-    // App.layout = Layout.fillByCount(
-    //   OrientationType.Flat,
-    //   // new Size(33, 17),
-    //   new Size(10, 10),
-    //   new Size(App.canvas.clientWidth * 0.97, App.canvas.clientHeight * 0.97));
-    // App.map = HexMap.rectangle(App.layout);
-    // const types = [ HexType.Invisible, HexType.Normal, HexType.Blue ];
-    // for (const key in App.map.hexes) {
-    //   if (App.map.hexes.hasOwnProperty(key)) {
-    //     App.map.hexes[key].changeType(types[Math.floor(Math.random() * 3)]);
-    //   }
-    // }
-    // App.map.draw(App.stage, App.layout);
-
-    // App.stage.update();
+    window.addEventListener("resize", () => {
+      App.draw();
+    });
 
     window.addEventListener("keypress", (event: KeyboardEvent) => {
       if (event.key === "e") {
@@ -86,60 +83,20 @@ export class App {
           App.mode = AppMode.Edit;
         else
           App.mode = AppMode.EditInit;
-        App.map.redraw();
+        App.board.redraw();
         App.stage.update();
       }
     });
+
+    App.board.draw();
+    App.draw();
   }
 
-  public static import(s: string) {
-    const lineStrings = s.split("\n");
-    let len = -1;
-    const lines = [];
-    let layout: Layout = null;
-    let map: HexMap = null;
-    for (let k = -1; k < lineStrings.length; k += 2) {
-      let line1 = "";
-      if (k > -1) {
-        line1 = lineStrings[k].replace(/\s/, "");
-      }
-      let line2 = "";
-      if (k + 1 < lineStrings.length) {
-        line2 = lineStrings[k + 1].replace(/\s/, "");
-      }
-      if (k === -1) {
-        len = line2.length;
-        if (len % 2 !== 0) {
-          console.log("Malformed import string");
-          return;
-        }
-        layout = Layout.fillByCount(
-          OrientationType.Flat,
-          new Size(len / 2, Math.ceil(lineStrings.length / 2)),
-          new Size(App.canvas.clientWidth * 0.97, App.canvas.clientHeight * 0.97),
-        );
-        map = HexMap.rectangle(layout);
-      }
-      if ((line1.length > 0 && line1.length !== len) || (line2.length > 0 &&  line2.length !== len)) {
-        console.log("Malformed import string");
-        return;
-      }
-      const cOffset = -Math.floor(len / 4);
-      const r = Math.floor(lineStrings.length / 4) - Math.floor((k + 1) / 2);
-      for (let i = 0; i < len; i += 2) {
-        const lineT = i % 4 === 0 ? line2 : line1;
-        const st = lineT === "" ? ".." : lineT.substr(i, 2);
-        const h = Hex.fromImportString(i / 2 + cOffset, r, st);
-        const h2 = map.get(h.q, h.r);
-        h2.countType = h.countType;
-        h2.sideCountDirection = h.sideCountDirection;
-        h2.covered = h.covered;
-        h2.changeType(h.type);
-      }
-    }
-    App.layout = layout;
-    App.map = map;
-    App.map.draw(App.stage, App.layout);
+  public static draw() {
+    App.canvas.width = App.canvas.parentElement.offsetWidth;
+    App.canvas.height = App.canvas.parentElement.offsetHeight;
+    App.board.resize();
+    App.board.redraw();
     App.stage.update();
   }
 }
