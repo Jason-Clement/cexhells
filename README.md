@@ -2,7 +2,9 @@ This is a [HexCells](http://www.matthewbrowngames.com/hexcellsinfinite.html) edi
 
 There is a hexcells editor already in existence by [oprypin](https://github.com/oprypin) that can be found [here](https://github.com/oprypin/sixcells).
 
-I wanted to make my own for funzies. I'm not sure I'll actually finish it.
+I wanted to make my own for funzies. I'm not sure I'll actually finish it. I did start converting this to angular, but then I got distracted and I never got back to it. Oh to have loads of free time would be so nice.
+
+A live version can be found [here](http://jasonclement.me/cexhells).
 
 ## Hotkeys
 
